@@ -17,29 +17,115 @@ import {
   ExternalLink
 } from 'lucide-react';
 
+type EventType = 'destroy' | 'soccer' | 'rc_race';
+type TicketWindow = 'early' | 'last_chance';
+type PassType = 'individual' | 'team';
+
 interface PassModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialEvent?: 'destroy' | 'soccer' | 'rc_race';
+  initialEvent?: EventType;
 }
 
+type RazorpayHandlerResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  prefill: {
+    name: string;
+    email: string;
+    contact: string;
+  };
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpayHandlerResponse) => void;
+  modal?: {
+    ondismiss?: () => void;
+  };
+};
+
+type RazorpayInstance = {
+  open: () => void;
+};
+
+type RazorpayConstructor = new (options: RazorpayOptions) => RazorpayInstance;
+
+declare global {
+  interface Window {
+    Razorpay?: RazorpayConstructor;
+  }
+}
+
+let razorpayScriptPromise: Promise<boolean> | null = null;
+
+const getEnvVar = (key: string): string | undefined => {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  return env?.[key];
+};
+
 const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(false);
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  if (razorpayScriptPromise) {
+    return razorpayScriptPromise;
+  }
+
+  const existingScript = document.querySelector('script[data-razorpay-checkout="true"]');
+  if (existingScript) {
+    if ((existingScript as HTMLScriptElement).dataset.loaded === 'true') {
+      return Promise.resolve(Boolean(window.Razorpay));
     }
+    razorpayScriptPromise = new Promise((resolve) => {
+      existingScript.addEventListener('load', () => resolve(Boolean(window.Razorpay)), { once: true });
+      existingScript.addEventListener('error', () => {
+        razorpayScriptPromise = null;
+        resolve(false);
+      }, { once: true });
+    });
+
+    return razorpayScriptPromise;
+  }
+
+  razorpayScriptPromise = new Promise((resolve) => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
+    script.dataset.razorpayCheckout = 'true';
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      const loaded = Boolean(window.Razorpay);
+      if (!loaded) {
+        razorpayScriptPromise = null;
+      }
+      resolve(loaded);
+    };
+    script.onerror = () => {
+      razorpayScriptPromise = null;
+      resolve(false);
+    };
     document.body.appendChild(script);
   });
+
+  return razorpayScriptPromise;
 };
 
 export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEvent = 'destroy' }) => {
-  const [selectedEvent, setSelectedEvent] = useState<'destroy' | 'soccer' | 'rc_race'>(initialEvent);
+  const [selectedEvent, setSelectedEvent] = useState<EventType>(initialEvent);
 
   useEffect(() => {
     if (initialEvent) {
@@ -47,8 +133,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     }
   }, [initialEvent, isOpen]);
 
-  const [ticketWindow, setTicketWindow] = useState<'early' | 'last_chance'>('early');
-  const [passType, setPassType] = useState<'individual' | 'team'>('team');
+  const [ticketWindow, setTicketWindow] = useState<TicketWindow>('early');
+  const [passType, setPassType] = useState<PassType>('team');
   const [step, setStep] = useState<'select' | 'details' | 'payment' | 'success'>('select');
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'razorpay'>('upi');
 
@@ -66,6 +152,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [utrNumber, setUtrNumber] = useState('');
   const [utrError, setUtrError] = useState('');
+  const [paymentError, setPaymentError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedTicket, setConfirmedTicket] = useState<{
     ticketId: string;
@@ -89,13 +176,13 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     }
   }
 
-  const eventNames: Record<'destroy' | 'soccer' | 'rc_race', string> = {
+  const eventNames: Record<EventType, string> = {
     destroy: 'Destroy-a-thon (Tower Crash)',
     soccer: 'Robo Soccer Fiesta',
     rc_race: 'RC Car Race (Offroad Reckoning)',
   };
 
-  const eventPassTitles: Record<'destroy' | 'soccer' | 'rc_race', string> = {
+  const eventPassTitles: Record<EventType, string> = {
     destroy: 'DESTROY-A-THON 2026 OFFICIAL PASS',
     soccer: 'ROBO SOCCER FIESTA 2026 OFFICIAL PASS',
     rc_race: 'RC CAR RACE 2026 OFFICIAL PASS',
@@ -108,18 +195,48 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
   const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${price}&cu=INR&tn=${encodeURIComponent(note)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(upiUrl)}`;
 
+  const registrationContext = {
+    event: selectedEvent,
+    eventName: eventNames[selectedEvent],
+    ticketWindow,
+    passType,
+    participant: {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      college: formData.college,
+      teamName: formData.teamName,
+      teamSize: formData.teamSize,
+    },
+  };
+
+  const buildTimestamp = () =>
+    new Date().toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const buildTicketId = () => {
+    const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
+    const prefix = selectedEvent === 'destroy' ? 'DST' : selectedEvent === 'soccer' ? 'SOC' : 'RCR';
+    return `JU-${prefix}-2026-${randomTicketNum}`;
+  };
+
   const persistRegistration = async (record: {
     ticketId: string;
-    event: 'destroy' | 'soccer' | 'rc_race';
+    event: EventType;
     eventName: string;
     name: string;
     email: string;
     phone: string;
     college: string;
-    passType: 'individual' | 'team';
+    passType: PassType;
     teamName?: string;
     teamSize?: string;
-    ticketWindow: 'early' | 'last_chance';
+    ticketWindow: TicketWindow;
     paymentMethod: string;
     txnRef: string;
     paidAmount: number;
@@ -137,23 +254,103 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     }
 
     // 2. Server-side persistence via API or Webhook if configured
-    const serverUrl =
-      (import.meta as any).env?.VITE_REGISTRATION_API_URL ||
-      ((import.meta as any).env?.VITE_API_BASE_URL
-        ? `${(import.meta as any).env.VITE_API_BASE_URL}/api/register`
-        : null);
+    const apiBaseUrl = getEnvVar('VITE_API_BASE_URL');
+    const serverUrl = getEnvVar('VITE_REGISTRATION_API_URL') || (apiBaseUrl ? `${apiBaseUrl}/api/register` : null);
 
     if (serverUrl) {
       try {
-        await fetch(serverUrl, {
+        const response = await fetch(serverUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(record),
         });
+        if (!response.ok) {
+          throw new Error(`Registration API responded with ${response.status}`);
+        }
       } catch (err) {
-        console.warn('Server registration persistence failed:', err);
+        console.error('Server registration persistence failed:', err);
+        throw new Error('Payment was verified, but registration confirmation failed. Please retry.');
       }
     }
+  };
+
+  // Verification endpoint contract:
+  // Request: JSON payload with payment details + registrationContext.
+  // Response: JSON with { success: boolean } (or { verified: boolean }) and optional message.
+  const verifyPayment = async (payload: Record<string, unknown>) => {
+    const verificationUrl = getEnvVar('VITE_PAYMENT_VERIFY_API_URL');
+    if (!verificationUrl) {
+      throw new Error('Payment verification is unavailable. Please contact support.');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(verificationUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error('Payment verification request failed:', error);
+      throw new Error('Could not reach payment verification service. Please check your connection and retry.');
+    }
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '');
+      const trimmedResponse = responseText.trim();
+      throw new Error(
+        trimmedResponse
+          ? `Payment verification failed: ${trimmedResponse}`
+          : `Payment verification failed with status ${response.status}.`
+      );
+    }
+
+    let result: unknown;
+    try {
+      result = await response.json();
+    } catch (error) {
+      console.error('Payment verification response was not valid JSON:', error);
+      throw new Error('Payment verification returned an invalid response.');
+    }
+
+    const responseObject = result as { success?: boolean; verified?: boolean; message?: string };
+    const isVerified = Boolean(responseObject.success ?? responseObject.verified);
+
+    if (!isVerified) {
+      throw new Error(responseObject.message || 'Payment could not be verified.');
+    }
+  };
+
+  const finalizeVerifiedRegistration = async (paymentMethodLabel: string, txnRef: string) => {
+    const ticketId = buildTicketId();
+    const timestamp = buildTimestamp();
+
+    await persistRegistration({
+      ticketId,
+      event: selectedEvent,
+      eventName: eventNames[selectedEvent],
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      college: formData.college,
+      passType,
+      teamName: formData.teamName,
+      teamSize: formData.teamSize,
+      ticketWindow,
+      paymentMethod: paymentMethodLabel,
+      txnRef,
+      paidAmount: price,
+      timestamp,
+    });
+
+    setConfirmedTicket({
+      ticketId,
+      method: paymentMethodLabel,
+      txnRef,
+      paidAmount: price,
+      timestamp,
+    });
+    setStep('success');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -174,151 +371,107 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     setStep('select');
     setUtrNumber('');
     setUtrError('');
+    setPaymentError('');
     setConfirmedTicket(null);
     setIsProcessing(false);
     onClose();
   };
 
-  const handleVerifyUtr = (e: React.FormEvent) => {
+  const handleVerifyUtr = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing) return;
+
     const cleanUtr = utrNumber.trim();
-    if (cleanUtr.length < 8) {
+    if (!/^\d{12}$/.test(cleanUtr)) {
       setUtrError('Please enter a valid 12-digit UPI reference (UTR) number.');
       return;
     }
     setUtrError('');
+    setPaymentError('');
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      await verifyPayment({
+        event: 'upi.utr.submit',
+        amount: price,
+        currency: 'INR',
+        utr: cleanUtr,
+        registrationContext,
+      });
+      await finalizeVerifiedRegistration('Direct UPI (Server Verified)', cleanUtr);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'UPI verification failed. Please retry.');
+    } finally {
       setIsProcessing(false);
-      const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
-      const prefix = selectedEvent === 'destroy' ? 'DST' : selectedEvent === 'soccer' ? 'SOC' : 'RCR';
-      const ticketId = `JU-${prefix}-2026-${randomTicketNum}`;
-      const timestamp = new Date().toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      setConfirmedTicket({
-        ticketId,
-        method: 'Direct UPI (UTR Verified)',
-        txnRef: cleanUtr,
-        paidAmount: price,
-        timestamp,
-      });
-
-      persistRegistration({
-        ticketId,
-        event: selectedEvent,
-        eventName: eventNames[selectedEvent],
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        college: formData.college,
-        passType,
-        teamName: formData.teamName,
-        teamSize: formData.teamSize,
-        ticketWindow,
-        paymentMethod: 'Direct UPI (UTR Verified)',
-        txnRef: cleanUtr,
-        paidAmount: price,
-        timestamp,
-      });
-
-      setStep('success');
-    }, 600);
+    }
   };
 
   const handlePayViaRazorpay = async () => {
+    if (isProcessing) return;
+    setPaymentError('');
     setIsProcessing(true);
-    const loaded = await loadRazorpayScript();
-
-    const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
-    const prefix = selectedEvent === 'destroy' ? 'DST' : selectedEvent === 'soccer' ? 'SOC' : 'RCR';
-    const ticketId = `JU-${prefix}-2026-${randomTicketNum}`;
-
-    const completeSuccess = (paymentId: string) => {
+    const razorpayKey = getEnvVar('VITE_RAZORPAY_KEY_ID');
+    if (!razorpayKey) {
+      setPaymentError('Online payment is unavailable right now. Please try UPI or contact support.');
       setIsProcessing(false);
-      const timestamp = new Date().toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      setConfirmedTicket({
-        ticketId,
-        method: 'Razorpay Online Gateway',
-        txnRef: paymentId,
-        paidAmount: price,
-        timestamp,
-      });
-
-      persistRegistration({
-        ticketId,
-        event: selectedEvent,
-        eventName: eventNames[selectedEvent],
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        college: formData.college,
-        passType,
-        teamName: formData.teamName,
-        teamSize: formData.teamSize,
-        ticketWindow,
-        paymentMethod: 'Razorpay Online Gateway',
-        txnRef: paymentId,
-        paidAmount: price,
-        timestamp,
-      });
-
-      setStep('success');
-    };
-
-    const razorpayKey = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID;
-
-    if (loaded && (window as any).Razorpay && razorpayKey) {
-      const options = {
-        key: razorpayKey,
-        amount: price * 100, // paise
-        currency: 'INR',
-        name: 'JUMakerspace x Red Bull',
-        description: `${eventNames[selectedEvent]} Pass`,
-        prefill: {
-          name: formData.name,
-          email: formData.email,
-          contact: formData.phone,
-        },
-        theme: {
-          color: '#EB0028',
-        },
-        handler: (response: any) => {
-          completeSuccess(response.razorpay_payment_id || `pay_${Date.now()}`);
-        },
-        modal: {
-          ondismiss: () => {
-            setIsProcessing(false);
-          },
-        },
-      };
-
-      try {
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-        return;
-      } catch (err) {
-        console.warn('Razorpay checkout error, running test simulation:', err);
-      }
+      return;
     }
 
-    // Interactive Demo / Test Mode Checkout Simulation
-    setTimeout(() => {
-      completeSuccess(`pay_rzp_${Math.random().toString(36).substring(2, 11).toUpperCase()}`);
-    }, 1000);
+    const loaded = await loadRazorpayScript();
+    if (!loaded || !window.Razorpay) {
+      setPaymentError('Unable to load Razorpay checkout. Please try again in a moment.');
+      setIsProcessing(false);
+      return;
+    }
+
+    const options: RazorpayOptions = {
+      key: razorpayKey,
+      amount: price * 100, // paise
+      currency: 'INR',
+      name: 'JUMakerspace x Red Bull',
+      description: `${eventNames[selectedEvent]} Pass`,
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone,
+      },
+      theme: {
+        color: '#EB0028',
+      },
+      handler: async (response: RazorpayHandlerResponse) => {
+        try {
+          await verifyPayment({
+            event: 'razorpay.checkout.success',
+            amount: price,
+            currency: 'INR',
+            paymentId: response.razorpay_payment_id,
+            orderId: response.razorpay_order_id,
+            signature: response.razorpay_signature,
+            registrationContext,
+          });
+          await finalizeVerifiedRegistration('Razorpay Online Gateway', response.razorpay_payment_id);
+        } catch (error) {
+          setPaymentError(error instanceof Error ? error.message : 'Razorpay payment verification failed.');
+        } finally {
+          setIsProcessing(false);
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          setIsProcessing(false);
+        },
+      },
+    };
+
+    try {
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      return;
+    } catch (err) {
+      console.error('Razorpay checkout initialization failed:', err);
+      setPaymentError('Unable to initialize Razorpay checkout. Please retry.');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -657,7 +810,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('upi')}
+                  onClick={() => {
+                    setPaymentMethod('upi');
+                    setPaymentError('');
+                  }}
                   className={`p-3 sm:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${paymentMethod === 'upi'
                     ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
                     : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
@@ -676,7 +832,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('razorpay')}
+                  onClick={() => {
+                    setPaymentMethod('razorpay');
+                    setPaymentError('');
+                  }}
                   className={`p-3 sm:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${paymentMethod === 'razorpay'
                     ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
                     : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
@@ -698,6 +857,12 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
             {/* TAB 1: Instant UPI (QR Code + Deep Link + UTR Submission) */}
             {paymentMethod === 'upi' && (
               <div className="space-y-4">
+                {paymentError && (
+                  <p role="alert" className="text-xs text-red-400 p-3 rounded-xl border border-red-500/40 bg-red-500/10 flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{paymentError}</span>
+                  </p>
+                )}
                 <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row items-center gap-5">
                     {/* Dynamic Scannable QR Code */}
@@ -762,13 +927,17 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                         placeholder="e.g. 426891048215 (12-digit UTR)"
                         value={utrNumber}
                         onChange={(e) => {
-                          setUtrNumber(e.target.value);
+                          setUtrNumber(e.target.value.replace(/\D/g, '').slice(0, 12));
                           if (utrError) setUtrError('');
+                          if (paymentError) setPaymentError('');
                         }}
+                        inputMode="numeric"
+                        maxLength={12}
+                        pattern="\d{12}"
                         className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/20 text-white text-sm font-mono focus:outline-none focus:border-brand-red"
                       />
                       {utrError && (
-                        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                        <p role="alert" className="text-xs text-red-400 mt-1 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
                           <span>{utrError}</span>
                         </p>
@@ -793,6 +962,12 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
             {/* TAB 2: Online Payment Gateway (Razorpay Checkout) */}
             {paymentMethod === 'razorpay' && (
               <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-6 text-center space-y-5">
+                {paymentError && (
+                  <p role="alert" className="text-xs text-red-400 p-3 rounded-xl border border-red-500/40 bg-red-500/10 flex items-center gap-2 text-left">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{paymentError}</span>
+                  </p>
+                )}
                 <div className="w-16 h-16 rounded-2xl bg-brand-red/15 border border-brand-red/30 flex items-center justify-center mx-auto text-brand-red">
                   <CreditCard className="w-8 h-8" />
                 </div>
