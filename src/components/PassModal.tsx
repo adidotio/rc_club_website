@@ -95,6 +95,12 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     rc_race: 'RC Car Race (Offroad Reckoning)',
   };
 
+  const eventPassTitles: Record<'destroy' | 'soccer' | 'rc_race', string> = {
+    destroy: 'DESTROY-A-THON 2026 OFFICIAL PASS',
+    soccer: 'ROBO SOCCER FIESTA 2026 OFFICIAL PASS',
+    rc_race: 'RC CAR RACE 2026 OFFICIAL PASS',
+  };
+
   const upiId = selectedEvent === 'rc_race' ? 'vendor.racing@okaxis' : 'makerspace.ju@okhdfcbank';
   const payeeName = selectedEvent === 'rc_race' ? 'RC Race Club Vendor' : 'JUMakerspace JECRC';
   const sanitizedName = formData.name ? formData.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) : 'ENTRY';
@@ -552,19 +558,36 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                Email Address *
-              </label>
-              <input
-                type="email"
-                required
-                name="email"
-                placeholder="e.g. aditya@jecrc.ac.in"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  name="email"
+                  placeholder="e.g. aditya@jecrc.ac.in"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                  College / Institution *
+                </label>
+                <input
+                  type="text"
+                  required
+                  name="college"
+                  placeholder="e.g. JECRC University"
+                  value={formData.college}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                />
+              </div>
             </div>
 
             {passType === 'team' && selectedEvent !== 'rc_race' && (
@@ -847,7 +870,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
             </div>
 
             {/* Official Digital E-Pass Badge */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 via-black to-zinc-900 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-left shadow-2xl space-y-4">
+            <div id="printable-ticket" className="relative overflow-hidden bg-gradient-to-br from-zinc-900 via-black to-zinc-900 border-2 border-white/20 rounded-3xl p-5 sm:p-6 text-left shadow-2xl space-y-4">
               {/* Pass Top Banner */}
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
@@ -855,7 +878,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     JUMAKERSPACE <span className="text-brand-red">X RED BULL</span>
                   </div>
                   <div className="text-[10px] font-mono text-zinc-400 uppercase">
-                    DESTROY-A-THON 2026 OFFICIAL PASS
+                    {eventPassTitles[selectedEvent]}
                   </div>
                 </div>
 
@@ -900,6 +923,13 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     </strong>
                   </div>
                 )}
+
+                <div>
+                  <span className="text-[10px] uppercase text-zinc-500 block">Institution</span>
+                  <strong className="text-zinc-300 font-condensed font-bold text-xs block truncate">
+                    {formData.college || 'JECRC University'}
+                  </strong>
+                </div>
 
                 <div>
                   <span className="text-[10px] uppercase text-zinc-500 block">Venue & Date</span>
