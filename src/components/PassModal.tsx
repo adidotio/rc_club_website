@@ -64,7 +64,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
   // Payment State
   const [copiedUpi, setCopiedUpi] = useState(false);
-  const [utrNumber, setUtrNumber] = useState('SSSS');
+  const [utrNumber, setUtrNumber] = useState('');
   const [utrError, setUtrError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedTicket, setConfirmedTicket] = useState<{
@@ -101,6 +101,54 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
   const note = `Pass-${selectedEvent.toUpperCase()}-${sanitizedName}`;
   const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${price}&cu=INR&tn=${encodeURIComponent(note)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(upiUrl)}`;
+
+  const persistRegistration = async (record: {
+    ticketId: string;
+    event: 'destroy' | 'soccer' | 'rc_race';
+    eventName: string;
+    name: string;
+    email: string;
+    phone: string;
+    college: string;
+    passType: 'individual' | 'team';
+    teamName?: string;
+    teamSize?: string;
+    ticketWindow: 'early' | 'last_chance';
+    paymentMethod: string;
+    txnRef: string;
+    paidAmount: number;
+    timestamp: string;
+  }) => {
+    // 1. Client-side persistence fallback
+    try {
+      const existing = JSON.parse(localStorage.getItem('rc_confirmed_registrations') || '[]');
+      localStorage.setItem(
+        'rc_confirmed_registrations',
+        JSON.stringify([...existing, { ...record, registeredAt: new Date().toISOString() }])
+      );
+    } catch (e) {
+      console.warn('Could not cache registration in localStorage:', e);
+    }
+
+    // 2. Server-side persistence via API or Webhook if configured
+    const serverUrl =
+      (import.meta as any).env?.VITE_REGISTRATION_API_URL ||
+      ((import.meta as any).env?.VITE_API_BASE_URL
+        ? `${(import.meta as any).env.VITE_API_BASE_URL}/api/register`
+        : null);
+
+    if (serverUrl) {
+      try {
+        await fetch(serverUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record),
+        });
+      } catch (err) {
+        console.warn('Server registration persistence failed:', err);
+      }
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -140,19 +188,40 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
       const randomTicketNum = Math.floor(10000 + Math.random() * 90000);
       const prefix = selectedEvent === 'destroy' ? 'DST' : selectedEvent === 'soccer' ? 'SOC' : 'RCR';
       const ticketId = `JU-${prefix}-2026-${randomTicketNum}`;
+      const timestamp = new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
       setConfirmedTicket({
         ticketId,
         method: 'Direct UPI (UTR Verified)',
         txnRef: cleanUtr,
         paidAmount: price,
-        timestamp: new Date().toLocaleDateString('en-IN', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        timestamp,
       });
+
+      persistRegistration({
+        ticketId,
+        event: selectedEvent,
+        eventName: eventNames[selectedEvent],
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        college: formData.college,
+        passType,
+        teamName: formData.teamName,
+        teamSize: formData.teamSize,
+        ticketWindow,
+        paymentMethod: 'Direct UPI (UTR Verified)',
+        txnRef: cleanUtr,
+        paidAmount: price,
+        timestamp,
+      });
+
       setStep('success');
     }, 600);
   };
@@ -167,19 +236,40 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
     const completeSuccess = (paymentId: string) => {
       setIsProcessing(false);
+      const timestamp = new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
       setConfirmedTicket({
         ticketId,
         method: 'Razorpay Online Gateway',
         txnRef: paymentId,
         paidAmount: price,
-        timestamp: new Date().toLocaleDateString('en-IN', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        timestamp,
       });
+
+      persistRegistration({
+        ticketId,
+        event: selectedEvent,
+        eventName: eventNames[selectedEvent],
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        college: formData.college,
+        passType,
+        teamName: formData.teamName,
+        teamSize: formData.teamSize,
+        ticketWindow,
+        paymentMethod: 'Razorpay Online Gateway',
+        txnRef: paymentId,
+        paidAmount: price,
+        timestamp,
+      });
+
       setStep('success');
     };
 
@@ -268,8 +358,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   type="button"
                   onClick={() => setSelectedEvent('destroy')}
                   className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'destroy'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                     }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
@@ -283,8 +373,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   type="button"
                   onClick={() => setSelectedEvent('soccer')}
                   className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'soccer'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                     }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
@@ -298,8 +388,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   type="button"
                   onClick={() => setSelectedEvent('rc_race')}
                   className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'rc_race'
-                      ? 'border-brand-cyan bg-brand-cyan/15 shadow-lg shadow-cyan-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    ? 'border-brand-cyan bg-brand-cyan/15 shadow-lg shadow-cyan-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                     }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
@@ -323,8 +413,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       type="button"
                       onClick={() => setTicketWindow('early')}
                       className={`p-3.5 rounded-xl border text-left transition-all ${ticketWindow === 'early'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                         }`}
                     >
                       <div className="flex items-center justify-between">
@@ -340,8 +430,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       type="button"
                       onClick={() => setTicketWindow('last_chance')}
                       className={`p-3.5 rounded-xl border text-left transition-all ${ticketWindow === 'last_chance'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                         }`}
                     >
                       <div className="font-condensed font-bold text-base uppercase">Last Chance</div>
@@ -359,8 +449,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       type="button"
                       onClick={() => setPassType('individual')}
                       className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'individual'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                         }`}
                     >
                       <User className="w-5 h-5 text-brand-red" />
@@ -374,8 +464,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       type="button"
                       onClick={() => setPassType('team')}
                       className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'team'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                         }`}
                     >
                       <Users className="w-5 h-5 text-brand-red" />
@@ -546,8 +636,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   type="button"
                   onClick={() => setPaymentMethod('upi')}
                   className={`p-3 sm:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${paymentMethod === 'upi'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
                     }`}
                 >
                   <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-brand-red">
@@ -565,8 +655,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   type="button"
                   onClick={() => setPaymentMethod('razorpay')}
                   className={`p-3 sm:p-4 rounded-2xl border text-left flex items-center gap-3 transition-all ${paymentMethod === 'razorpay'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
                     }`}
                 >
                   <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-brand-red">
@@ -696,9 +786,6 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <div className="inline-flex items-center justify-center gap-3 px-4 py-2 rounded-xl bg-black/60 border border-white/10 text-xs text-zinc-300">
                   <span>Payable Amount:</span>
                   <span className="font-condensed font-black text-xl text-white">₹{price}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
-                    Razorpay 256-Bit SSL
-                  </span>
                 </div>
 
                 <div>
