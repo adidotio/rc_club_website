@@ -282,12 +282,42 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     const razorpayKey = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID;
 
     if (loaded && (window as any).Razorpay && razorpayKey) {
-      const options = {
+      let orderId: string | undefined = undefined;
+
+      try {
+        const orderRes = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: price * 100, // in paise
+            receipt: ticketId,
+            notes: {
+              ticketId,
+              event: selectedEvent,
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone,
+            },
+          }),
+        });
+
+        if (orderRes.ok) {
+          const orderData = await orderRes.json();
+          if (orderData?.id) {
+            orderId = orderData.id;
+          }
+        }
+      } catch (orderErr) {
+        console.warn('Backend order creation bypassed, fallback to client checkout:', orderErr);
+      }
+
+      const options: any = {
         key: razorpayKey,
         amount: price * 100, // paise
         currency: 'INR',
         name: 'JUMakerspace x Red Bull',
         description: `${eventNames[selectedEvent]} Pass`,
+        order_id: orderId,
         prefill: {
           name: formData.name,
           email: formData.email,
@@ -308,6 +338,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
       try {
         const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any) {
+          setIsProcessing(false);
+          console.error('Razorpay payment failed:', response?.error);
+        });
         rzp.open();
         return;
       } catch (err) {
