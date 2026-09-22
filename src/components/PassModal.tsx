@@ -7,25 +7,11 @@ interface PassModalProps {
   initialEvent?: 'destroy' | 'soccer' | 'rc_race';
 }
 
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
 
 export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEvent = 'destroy' }) => {
   const [selectedEvent, setSelectedEvent] = useState<'destroy' | 'soccer' | 'rc_race'>(initialEvent);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (initialEvent) {
       setSelectedEvent(initialEvent);
     }
@@ -64,16 +50,6 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleCopyUpi = () => {
-    navigator.clipboard.writeText(upiId);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 2000);
-  };
-
-  const handleOpenUpiApp = () => {
-    window.location.href = upiUrl;
   };
 
   const resetAndClose = () => {
@@ -167,7 +143,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               OFFICIAL EVENT PASS
             </div>
             <h2 className="font-condensed font-black text-2xl sm:text-4xl text-white tracking-wider uppercase leading-none">
-              {step === 'success' ? 'REGISTRATION CONFIRMED' : 'GET YOUR PASS'}
+              {step === 'payment' ? 'REGISTRATION CONFIRMED' : 'GET YOUR PASS'}
             </h2>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
               12th &middot; 13th October 2026 &middot; Central Lawn, JECRC
