@@ -7,10 +7,25 @@ interface PassModalProps {
   initialEvent?: 'destroy' | 'soccer' | 'rc_race';
 }
 
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEvent = 'destroy' }) => {
   const [selectedEvent, setSelectedEvent] = useState<'destroy' | 'soccer' | 'rc_race'>(initialEvent);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialEvent) {
       setSelectedEvent(initialEvent);
     }
@@ -49,6 +64,16 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(upiId);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const handleOpenUpiApp = () => {
+    window.location.href = upiUrl;
   };
 
   const resetAndClose = () => {
@@ -129,20 +154,20 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div 
-        className="relative w-full max-w-2xl bg-zinc-950 border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl text-white my-8 max-h-[90vh] overflow-y-auto"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+      <div
+        className="relative w-full max-w-2xl bg-zinc-950 border border-white/20 rounded-3xl p-5 sm:p-8 shadow-2xl text-white my-6 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Close */}
-        <div className="flex items-start justify-between border-b border-white/10 pb-5">
+        <div className="flex items-start justify-between border-b border-white/10 pb-4 sm:pb-5">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-condensed font-bold tracking-widest uppercase mb-2">
               <Sparkles className="w-3.5 h-3.5" />
               OFFICIAL EVENT PASS
             </div>
-            <h2 className="font-condensed font-black text-3xl sm:text-4xl text-white tracking-wider uppercase leading-none">
-              GET YOUR PASS
+            <h2 className="font-condensed font-black text-2xl sm:text-4xl text-white tracking-wider uppercase leading-none">
+              {step === 'success' ? 'REGISTRATION CONFIRMED' : 'GET YOUR PASS'}
             </h2>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
               12th &middot; 13th October 2026 &middot; Central Lawn, JECRC
@@ -170,11 +195,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <button
                   type="button"
                   onClick={() => setSelectedEvent('destroy')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${
-                    selectedEvent === 'destroy'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                  }`}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'destroy'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
                     Destroy-a-thon
@@ -186,11 +210,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <button
                   type="button"
                   onClick={() => setSelectedEvent('soccer')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${
-                    selectedEvent === 'soccer'
-                      ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                  }`}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'soccer'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
                     Robo Soccer
@@ -202,11 +225,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <button
                   type="button"
                   onClick={() => setSelectedEvent('rc_race')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${
-                    selectedEvent === 'rc_race'
-                      ? 'border-brand-cyan bg-brand-cyan/15 shadow-lg shadow-cyan-600/20'
-                      : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                  }`}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'rc_race'
+                    ? 'border-brand-cyan bg-brand-cyan/15 shadow-lg shadow-cyan-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
                     RC Car Race
@@ -261,11 +283,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     <button
                       type="button"
                       onClick={() => setTicketWindow('last_chance')}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${
-                        ticketWindow === 'last_chance'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                      }`}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${ticketWindow === 'last_chance'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        }`}
                     >
                       <div className="font-condensed font-bold text-base uppercase">Last Chance</div>
                       <div className="text-[11px] text-zinc-400 mt-1">3rd – 6th Oct 2026</div>
@@ -281,11 +302,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     <button
                       type="button"
                       onClick={() => setPassType('individual')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${
-                        passType === 'individual'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                      }`}
+                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'individual'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        }`}
                     >
                       <User className="w-5 h-5 text-brand-red" />
                       <div>
@@ -297,11 +317,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     <button
                       type="button"
                       onClick={() => setPassType('team')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${
-                        passType === 'team'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                      }`}
+                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'team'
+                        ? 'border-brand-red bg-brand-red/15'
+                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                        }`}
                     >
                       <Users className="w-5 h-5 text-brand-red" />
                       <div>
@@ -384,19 +403,36 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                Email Address *
-              </label>
-              <input
-                type="email"
-                required
-                name="email"
-                placeholder="e.g. aditya@jecrc.ac.in"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  name="email"
+                  placeholder="e.g. aditya@jecrc.ac.in"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                  College / Institution *
+                </label>
+                <input
+                  type="text"
+                  required
+                  name="college"
+                  placeholder="e.g. JECRC University"
+                  value={formData.college}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                />
+              </div>
             </div>
 
             {passType === 'team' && selectedEvent !== 'rc_race' && (
