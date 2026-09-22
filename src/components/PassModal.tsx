@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, QrCode, Sparkles, ShieldAlert, Users, User, ArrowRight } from 'lucide-react';
+import { X, Check, Sparkles, ShieldAlert, Users, User, ArrowRight } from 'lucide-react';
 
 interface PassModalProps {
   isOpen: boolean;
@@ -15,9 +15,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
       setSelectedEvent(initialEvent);
     }
   }, [initialEvent, isOpen]);
-  const [ticketWindow, setTicketWindow] = useState<'early' | 'last_chance'>('early');
+  const [ticketWindow, setTicketWindow] = useState<'early' | 'new_day' | 'last_chance'>('early');
   const [passType, setPassType] = useState<'individual' | 'team'>('team');
   const [step, setStep] = useState<'select' | 'details' | 'payment'>('select');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -27,19 +28,22 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
     college: 'JECRC University',
     teamName: '',
     teamSize: '3',
+    teamMembers: ['', '', ''] as string[],
   });
 
   if (!isOpen) return null;
 
-  // Calculate pricing based on logic from registration_fee.txt
+  // Calculate pricing
   let price = 0;
   if (selectedEvent === 'rc_race') {
     price = 299; // External Vendor price
   } else {
     if (ticketWindow === 'early') {
-      price = passType === 'individual' ? 99 : 449;
+      price = passType === 'individual' ? 99 : 399;
+    } else if (ticketWindow === 'new_day') {
+      price = passType === 'individual' ? 129 : 499;
     } else {
-      price = passType === 'individual' ? 199 : 849;
+      price = passType === 'individual' ? 179 : 699;
     }
   }
 
@@ -49,7 +53,79 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
   const resetAndClose = () => {
     setStep('select');
+    setIsProcessing(false);
     onClose();
+  };
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    
+    try {
+      // 1. Create order
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: price * 100 }), // amount in paise
+      });
+      
+      const order = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(order.message || 'Failed to create order');
+      }
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        key: (import.meta as any).env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'JUMakerspace',
+        description: 'Event Registration Pass',
+        order_id: order.id,
+        handler: async function (paymentResponse: any) {
+          // 3. Verify payment
+          try {
+            const verifyRes = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+              }),
+            });
+            
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok && verifyData.status === 'ok') {
+              setStep('payment'); // Move to success step
+            } else {
+              alert('Payment verification failed: ' + verifyData.message);
+            }
+          } catch (error) {
+            alert('Payment verification error. Please contact support.');
+          }
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        theme: {
+          color: '#E63946', // brand-red
+        },
+      };
+      
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (errorResponse: any) {
+        alert('Payment Failed: ' + errorResponse.error.description);
+      });
+      rzp.open();
+    } catch (error: any) {
+      alert('Error initiating payment: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -69,7 +145,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               GET YOUR PASS
             </h2>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
-              29th &middot; 30th September 2026 &middot; Central Lawn, JECRC
+              12th &middot; 13th October 2026 &middot; Central Lawn, JECRC
             </p>
           </div>
 
@@ -148,7 +224,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                   <label className="block text-xs font-condensed font-bold tracking-widest text-zinc-300 uppercase mb-3">
                     2. TICKET WINDOW
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setTicketWindow('early')}
@@ -160,11 +236,26 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-condensed font-bold text-base uppercase">Early Bird</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      </div>
+                      <div className="text-[11px] text-zinc-400 mt-1">26th – 28th Sept 2026</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTicketWindow('new_day')}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${
+                        ticketWindow === 'new_day'
+                          ? 'border-brand-red bg-brand-red/15'
+                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-condensed font-bold text-base uppercase">New Day</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                           Active
                         </span>
                       </div>
-                      <div className="text-xs text-zinc-400 mt-1">19th – 23rd Sept 2026</div>
+                      <div className="text-[11px] text-zinc-400 mt-1">30th Sept – 2nd Oct 2026</div>
                     </button>
 
                     <button
@@ -177,7 +268,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       }`}
                     >
                       <div className="font-condensed font-bold text-base uppercase">Last Chance</div>
-                      <div className="text-xs text-zinc-400 mt-1">25th – 27th Sept 2026</div>
+                      <div className="text-[11px] text-zinc-400 mt-1">3rd – 6th Oct 2026</div>
                     </button>
                   </div>
                 </div>
@@ -199,7 +290,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       <User className="w-5 h-5 text-brand-red" />
                       <div>
                         <div className="font-condensed font-bold text-base uppercase">Individual</div>
-                        <div className="text-[11px] text-zinc-400">Team assigned by organizers</div>
+                        <div className="text-[11px] text-zinc-400">We'll make the team for these</div>
                       </div>
                     </button>
 
@@ -215,7 +306,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                       <Users className="w-5 h-5 text-brand-red" />
                       <div>
                         <div className="font-condensed font-bold text-base uppercase">Team Pass</div>
-                        <div className="text-[11px] text-zinc-400">2 – 5 members squad</div>
+                        <div className="text-[11px] text-zinc-400">2 – 4 members squad</div>
                       </div>
                     </button>
                   </div>
@@ -258,10 +349,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
         {/* Step 2: Participant Details */}
         {step === 'details' && (
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setStep('payment');
-            }}
+            onSubmit={handlePayment}
             className="py-5 space-y-4"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -312,39 +400,60 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
             </div>
 
             {passType === 'team' && selectedEvent !== 'rc_race' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                    Team Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    name="teamName"
-                    placeholder="e.g. Kinetic Smashers"
-                    value={formData.teamName}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-                  />
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                      Team Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="teamName"
+                      placeholder="e.g. Kinetic Smashers"
+                      value={formData.teamName}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                      Team Size (2 to 4) *
+                    </label>
+                    <select
+                      name="teamSize"
+                      value={formData.teamSize}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                    >
+                      <option value="2">2 Members</option>
+                      <option value="3">3 Members</option>
+                      <option value="4">4 Members</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                    Team Members (2 to 5) *
-                  </label>
-                  <select
-                    name="teamSize"
-                    value={formData.teamSize}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-                  >
-                    <option value="2">2 Members</option>
-                    <option value="3">3 Members</option>
-                    <option value="4">4 Members</option>
-                    <option value="5">5 Members</option>
-                  </select>
-                </div>
-              </div>
+                {Array.from({ length: parseInt(formData.teamSize) - 1 }).map((_, idx) => (
+                  <div key={idx}>
+                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
+                      Member {idx + 2} Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.teamMembers[idx] || ''}
+                      onChange={(e) => {
+                        const updatedMembers = [...formData.teamMembers];
+                        updatedMembers[idx] = e.target.value;
+                        setFormData({ ...formData, teamMembers: updatedMembers });
+                      }}
+                      placeholder={`e.g. Member ${idx + 2} Name`}
+                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
+                    />
+                  </div>
+                ))}
+              </>
             )}
 
             <div className="pt-4 border-t border-white/10 flex items-center justify-between">
@@ -358,65 +467,55 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-brand-red hover:bg-brand-redDark text-white font-condensed font-bold text-base uppercase tracking-wider shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                disabled={isProcessing}
+                className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-brand-red hover:bg-brand-redDark text-white font-condensed font-bold text-base uppercase tracking-wider shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>Proceed to Pay ₹{price}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>{isProcessing ? 'Processing...' : `Proceed to Pay ₹${price}`}</span>
+                {!isProcessing && <ArrowRight className="w-4 h-4" />}
               </button>
             </div>
           </form>
         )}
 
-        {/* Step 3: UPI QR & Confirmation */}
+        {/* Step 3: Success Confirmation */}
         {step === 'payment' && (
           <div className="py-5 text-center space-y-5">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-red/20 text-brand-red border border-brand-red/40 mx-auto">
-              <QrCode className="w-7 h-7" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 mx-auto">
+              <Check className="w-8 h-8" />
             </div>
 
             <div>
-              <h3 className="font-condensed font-black text-2xl uppercase tracking-wider text-white">
-                SCAN & PAY VIA UPI
+              <h3 className="font-condensed font-black text-3xl uppercase tracking-wider text-white">
+                PAYMENT SUCCESSFUL!
               </h3>
-              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                Scan using any UPI App (GPay, PhonePe, Paytm). Amount:{' '}
-                <strong className="text-white text-sm">₹{price}</strong>
+              <p className="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
+                Thank you, <strong>{formData.name}</strong>. Your registration for{' '}
+                <strong className="text-white">{selectedEvent === 'destroy' ? 'Destroy-a-thon' : selectedEvent === 'soccer' ? 'Robo Soccer' : 'RC Car Race'}</strong>{' '}
+                has been confirmed.
               </p>
             </div>
 
-            {/* QR Mock Display */}
-            <div className="w-48 h-48 mx-auto bg-white p-3 rounded-2xl shadow-2xl flex flex-col items-center justify-center">
-              <div className="w-full h-full border-2 border-dashed border-zinc-300 rounded-xl flex flex-col items-center justify-center p-2 text-black">
-                <QrCode className="w-28 h-28 text-black" />
-                <span className="text-[10px] font-mono font-bold mt-1 uppercase text-zinc-700">
-                  {selectedEvent === 'rc_race' ? 'VENDOR-RC-RACE-UPI' : 'JUMAKERSPACE@UPI'}
-                </span>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left max-w-sm mx-auto">
+              <div className="text-xs text-zinc-400 mb-1">Pass Type</div>
+              <div className="font-bold text-white uppercase text-sm mb-3">
+                {passType} {selectedEvent !== 'rc_race' && (passType === 'team' ? `(${formData.teamSize} Members)` : '')}
               </div>
-            </div>
-
-            <div className="text-xs text-zinc-400">
-              UPI ID: <span className="font-mono text-white font-bold">{selectedEvent === 'rc_race' ? 'vendor.racing@okaxis' : 'makerspace.ju@okhdfcbank'}</span>
+              <div className="text-xs text-zinc-400 mb-1">Amount Paid</div>
+              <div className="font-bold text-white text-lg">₹{price}</div>
             </div>
 
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-xs text-emerald-400 flex items-center justify-center gap-2">
               <Check className="w-4 h-4 shrink-0" />
-              <span>After paying, keep the transaction screenshot ready at desk verification!</span>
+              <span>You will receive an email confirmation shortly!</span>
             </div>
 
-            <div className="pt-2 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStep('details')}
-                className="px-5 py-2.5 rounded-full border border-white/20 text-zinc-300 hover:text-white text-xs font-condensed font-bold uppercase"
-              >
-                Back
-              </button>
+            <div className="pt-4 flex items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={resetAndClose}
-                className="px-8 py-2.5 rounded-full bg-brand-red hover:bg-brand-redDark text-white text-xs font-condensed font-bold uppercase tracking-wider shadow-lg shadow-red-600/30"
+                className="px-8 py-3 rounded-full bg-brand-red hover:bg-brand-redDark text-white text-sm font-condensed font-bold uppercase tracking-wider shadow-lg shadow-red-600/30 w-full max-w-sm"
               >
-                Done
+                Close Window
               </button>
             </div>
           </div>
