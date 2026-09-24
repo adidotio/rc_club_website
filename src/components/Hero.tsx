@@ -14,7 +14,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
         <div 
           className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat pointer-events-none"
           style={{
-            backgroundImage: `url('/images/hero_img.png')`,
+            backgroundImage: `url('/images/hero.png')`,
             backgroundPosition: 'center 30%',
           }}
         >
@@ -62,7 +62,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                     JECRC UNIVERSITY
                   </span>
                   <span className="text-zinc-400 text-xs xl:text-sm font-normal mt-0.5 tracking-wide">
-                    (Venue: to be confirmed)
+                    Central Lawn
                   </span>
                 </div>
               </div>
@@ -107,9 +107,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
           >
             <div className="space-y-1.5 drop-shadow-md">
               <h3 className="font-condensed font-black text-base xl:text-lg tracking-widest uppercase">
-                <span className="text-white">JUMAKERSPACE</span>{' '}
-                <span className="text-zinc-400">X</span>{' '}
-                <span className="text-brand-red">RED BULL</span>
+                <span className="text-white">JUMAKERSPACE</span>
               </h3>
               <p className="font-sans text-zinc-300 text-xs xl:text-sm font-medium tracking-wide uppercase leading-snug">
                 A HIGH-ENERGY EVENT BRINGING TOGETHER ENGINEERING, INNOVATION AND YOUTH CULTURE.
@@ -171,7 +169,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
           <div className="my-auto py-8">
             <div className="inline-block bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-brand-red/30 mb-4">
               <span className="text-xs font-condensed font-bold tracking-widest text-brand-red uppercase">
-                JUMAKERSPACE X RED BULL
+                JUMAKERSPACE
               </span>
             </div>
 
@@ -207,7 +205,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                     JECRC UNIVERSITY
                   </span>
                   <span className="text-zinc-400 text-[11px] font-normal">
-                    (Venue: to be confirmed)
+                    Central Lawn
                   </span>
                 </div>
               </div>

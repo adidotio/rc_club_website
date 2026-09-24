@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Check, Sparkles, ShieldAlert, Users, User, ArrowRight } from 'lucide-react';
+import { X, Check, Sparkles, ShieldAlert, Users, User, ArrowRight, Clock } from 'lucide-react';
+import { TICKET_WINDOWS, getWindowStatus, formatTimeLeft, TicketWindowId } from '../utils/tickets';
 
 interface PassModalProps {
   isOpen: boolean;
@@ -16,10 +17,20 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
       setSelectedEvent(initialEvent);
     }
   }, [initialEvent, isOpen]);
-  const [ticketWindow, setTicketWindow] = useState<'early' | 'new_day' | 'last_chance'>('early');
+  const [ticketWindow, setTicketWindow] = useState<TicketWindowId>(() => {
+    const active = TICKET_WINDOWS.find((w) => getWindowStatus(w, new Date()) === 'active');
+    return active ? active.id : 'early';
+  });
   const [passType, setPassType] = useState<'individual' | 'team'>('team');
   const [step, setStep] = useState<'select' | 'details' | 'payment'>('select');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [isOpen]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -39,12 +50,9 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
   if (selectedEvent === 'rc_race') {
     price = 299; // External Vendor price
   } else {
-    if (ticketWindow === 'early') {
-      price = passType === 'individual' ? 99 : 399;
-    } else if (ticketWindow === 'new_day') {
-      price = passType === 'individual' ? 129 : 499;
-    } else {
-      price = passType === 'individual' ? 179 : 699;
+    const windowConfig = TICKET_WINDOWS.find((w) => w.id === ticketWindow);
+    if (windowConfig) {
+      price = passType === 'individual' ? windowConfig.prices.individual : windowConfig.prices.team;
     }
   }
 
@@ -223,50 +231,69 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                     2. TICKET WINDOW
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTicketWindow('early')}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${
-                        ticketWindow === 'early'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-condensed font-bold text-base uppercase">Early Bird</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-400 mt-1">26th – 28th Sept 2026</div>
-                    </button>
+                    {TICKET_WINDOWS.map((window) => {
+                      const status = getWindowStatus(window, now);
+                      const isSelected = ticketWindow === window.id;
+                      const isLocked = status !== 'active';
 
-                    <button
-                      type="button"
-                      onClick={() => setTicketWindow('new_day')}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${
-                        ticketWindow === 'new_day'
-                          ? 'border-brand-red bg-brand-red/15'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-condensed font-bold text-base uppercase">New Day</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          Active
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-zinc-400 mt-1">30th Sept – 2nd Oct 2026</div>
-                    </button>
+                      return (
+                        <button
+                          key={window.id}
+                          type="button"
+                          disabled={isLocked}
+                          onClick={() => setTicketWindow(window.id)}
+                          className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
+                            isSelected && !isLocked
+                              ? 'border-brand-red bg-brand-red/15'
+                              : isLocked
+                              ? 'border-white/5 bg-zinc-900/40 opacity-75 cursor-not-allowed'
+                              : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                          }`}
+                        >
+                          <div className="flex flex-col h-full justify-between">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-condensed font-bold text-base uppercase">{window.name}</span>
+                                {status === 'active' && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-zinc-400">
+                                {window.startDate.getDate()} {window.startDate.toLocaleString('default', { month: 'short' })} – {window.endDate.getDate()} {window.endDate.toLocaleString('default', { month: 'short' })}
+                              </div>
+                            </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setTicketWindow('last_chance')}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${ticketWindow === 'last_chance'
-                        ? 'border-brand-red bg-brand-red/15'
-                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                        }`}
-                    >
-                      <div className="font-condensed font-bold text-base uppercase">Last Chance</div>
-                      <div className="text-[11px] text-zinc-400 mt-1">3rd – 6th Oct 2026</div>
-                    </button>
+                            {status === 'upcoming' && (
+                              <div className="mt-2 pt-2 border-t border-white/5">
+                                <div className="text-[9px] text-brand-red font-bold uppercase mb-0.5">Starts in</div>
+                                <div className="flex items-center gap-1 text-xs font-mono text-zinc-300">
+                                  <Clock className="w-3 h-3 text-brand-red" />
+                                  {formatTimeLeft(window.startDate, now)}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {status === 'expired' && (
+                              <div className="mt-2 pt-2 border-t border-white/5">
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase">Expired</div>
+                              </div>
+                            )}
+
+                            {status === 'active' && (
+                              <div className="mt-2 pt-2 border-t border-white/5">
+                                <div className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">Ends in</div>
+                                <div className="flex items-center gap-1 text-xs font-mono text-zinc-300">
+                                  <Clock className="w-3 h-3 text-emerald-500" />
+                                  {formatTimeLeft(window.endDate, now)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -317,7 +344,6 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               </div>
             )}
 
-            {/* Total Price & Proceed */}
             <div className="pt-4 border-t border-white/10 flex items-center justify-between">
               <div>
                 <span className="text-xs text-zinc-400 uppercase tracking-wider block">Registration Fee</span>
@@ -329,14 +355,25 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setStep('details')}
-                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-brand-red hover:bg-brand-redDark text-white font-condensed font-bold text-base uppercase tracking-wider shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-              >
-                <span>Continue</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {(() => {
+                const currentWindowConfig = TICKET_WINDOWS.find((w) => w.id === ticketWindow);
+                const isLocked = selectedEvent !== 'rc_race' && currentWindowConfig && getWindowStatus(currentWindowConfig, now) !== 'active';
+                return (
+                  <button
+                    type="button"
+                    disabled={isLocked || false}
+                    onClick={() => setStep('details')}
+                    className={`inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-condensed font-bold text-base uppercase tracking-wider shadow-lg transition-all ${
+                      isLocked
+                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-75'
+                        : 'bg-brand-red hover:bg-brand-redDark text-white shadow-red-600/30 hover:scale-105 active:scale-95 cursor-pointer'
+                    }`}
+                  >
+                    <span>{isLocked ? 'Not Available' : 'Continue'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

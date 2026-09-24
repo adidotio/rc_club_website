@@ -39,14 +39,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onGetPassClick }) => {
         <a
           href="#home"
           onClick={() => setActiveSection('home')}
-          className="group flex flex-col tracking-tight transition-transform duration-200 hover:scale-[1.02]"
+          className="group flex flex-col justify-center transition-transform duration-200 hover:scale-[1.02]"
         >
-          <span className="font-condensed font-black text-2xl sm:text-3xl tracking-wider text-white uppercase leading-none">
-            JUMAKERSPACE
-          </span>
-          <span className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] text-zinc-400 font-medium uppercase mt-0.5">
-            BUILD &middot; INNOVATE &middot; TOGETHER
-          </span>
+          <img 
+            src="/images/logo.png" 
+            alt="JUMakerspace" 
+            className="h-16 sm:h-20 lg:h-24 w-auto object-contain"
+          />
         </a>
 
         {/* Desktop Nav Links */}
