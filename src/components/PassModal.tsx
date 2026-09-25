@@ -154,7 +154,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               {step === 'payment' ? 'REGISTRATION CONFIRMED' : 'GET YOUR PASS'}
             </h2>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
-              12th &middot; 13th October 2026 &middot; Central Lawn, JECRC
+              12th &middot; 13th October 2026 &middot; American Football Ground, JECRC
             </p>
           </div>
 
