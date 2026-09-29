@@ -54,7 +54,7 @@ export const Experience: React.FC<ExperienceProps> = ({ onSelectEvent }) => {
         {/* Interactive Overlays for Each Card & Arrow Buttons */}
         {cards.map((card) => (
           <React.Fragment key={card.id}>
-            {card.id !== 'expo' && (
+            {card.id === 'rc_race' && (
               <>
                 {/* Full Card Clickable Target with Subtle Hover Highlight */}
                 <div

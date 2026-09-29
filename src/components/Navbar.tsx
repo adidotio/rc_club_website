@@ -21,8 +21,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onGetPassClick }) => {
   const navLinks = [
     { label: 'HOME', id: 'home' },
     { label: 'EXPERIENCE', id: 'experience' },
-    { label: 'SCHEDULE', id: 'schedule' },
-    { label: 'VENUE', id: 'venue' },
     { label: 'FAQ', id: 'faq' },
   ];
 
@@ -35,18 +33,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onGetPassClick }) => {
       }`}
     >
       <div className="max-w-[1920px] mx-auto px-4 sm:px-8 lg:px-14 flex items-center justify-between">
-        {/* Brand Logo */}
-        <a
-          href="#home"
-          onClick={() => setActiveSection('home')}
-          className="group flex flex-col justify-center transition-transform duration-200 hover:scale-[1.02]"
-        >
-          <img 
-            src="/images/logo.png" 
-            alt="JUMakerspace" 
-            className="h-16 sm:h-20 lg:h-24 w-auto object-contain"
-          />
-        </a>
 
         {/* Desktop Nav Links */}
         <div className="hidden md:flex items-center gap-7 lg:gap-10">
@@ -84,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onGetPassClick }) => {
         </div>
 
         {/* Mobile Hamburger Button */}
-        <div className="md:hidden flex items-center gap-3">
+        <div className="md:hidden flex items-center justify-end w-full gap-3">
           <button
             onClick={onGetPassClick}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-brand-red text-white font-condensed font-bold text-xs tracking-wider uppercase shadow-md shadow-red-600/30"

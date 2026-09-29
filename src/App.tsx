@@ -3,16 +3,14 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { About } from './components/About';
 import { Experience } from './components/Experience';
-import { EventPasses } from './components/EventPasses';
-import { ScheduleVenue } from './components/ScheduleVenue';
 import { Footer } from './components/Footer';
 import { PassModal } from './components/PassModal';
 
 export function App() {
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
-  const [selectedPass, setSelectedPass] = useState<'destroy' | 'soccer' | 'rc_race'>('destroy');
+  const [selectedPass, setSelectedPass] = useState<'destroy' | 'soccer' | 'rc_race' | 'offroad' | 'speed'>('offroad');
 
-  const handleOpenPass = (event: 'destroy' | 'soccer' | 'rc_race' = 'destroy') => {
+  const handleOpenPass = (event: 'destroy' | 'soccer' | 'rc_race' | 'offroad' | 'speed' = 'offroad') => {
     setSelectedPass(event);
     setIsPassModalOpen(true);
   };
@@ -42,11 +40,6 @@ export function App() {
         <Hero onGetPassClick={() => handleOpenPass('destroy')} />
         <About />
         <Experience onSelectEvent={handleSelectExperience} />
-        <EventPasses 
-          onSelectPass={(pass) => handleOpenPass(pass)} 
-          onExploreClick={() => handleOpenPass('destroy')} 
-        />
-        <ScheduleVenue />
       </main>
 
       {/* Footer Section (07 Ready To Enter?) */}

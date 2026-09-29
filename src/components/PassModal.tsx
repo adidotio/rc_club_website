@@ -1,36 +1,30 @@
 import React, { useState } from 'react';
-import { X, Check, Sparkles, ShieldAlert, Users, User, ArrowRight, Clock } from 'lucide-react';
-import { TICKET_WINDOWS, getWindowStatus, formatTimeLeft, TicketWindowId } from '../utils/tickets';
+import { X, Check, ArrowRight, Sparkles } from 'lucide-react';
+
 
 interface PassModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialEvent?: 'destroy' | 'soccer' | 'rc_race';
+  initialEvent?: 'destroy' | 'soccer' | 'rc_race' | 'offroad' | 'speed';
 }
 
-
-export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEvent = 'destroy' }) => {
-  const [selectedEvent, setSelectedEvent] = useState<'destroy' | 'soccer' | 'rc_race'>(initialEvent);
+export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEvent = 'offroad' }) => {
+  const [selectedEvent, setSelectedEvent] = useState<'destroy' | 'soccer' | 'rc_race' | 'offroad' | 'speed'>(
+    (initialEvent === 'rc_race' || initialEvent === 'destroy' || initialEvent === 'soccer') ? 'offroad' : (initialEvent as any)
+  );
 
   React.useEffect(() => {
     if (initialEvent) {
-      setSelectedEvent(initialEvent);
+      if (initialEvent === 'rc_race' || initialEvent === 'destroy' || initialEvent === 'soccer') {
+        setSelectedEvent('offroad');
+      } else {
+        setSelectedEvent(initialEvent);
+      }
     }
   }, [initialEvent, isOpen]);
-  const [ticketWindow, setTicketWindow] = useState<TicketWindowId>(() => {
-    const active = TICKET_WINDOWS.find((w) => getWindowStatus(w, new Date()) === 'active');
-    return active ? active.id : 'early';
-  });
-  const [passType, setPassType] = useState<'individual' | 'team'>('team');
+
   const [step, setStep] = useState<'select' | 'details' | 'payment'>('select');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [now, setNow] = useState(new Date());
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, [isOpen]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -45,16 +39,8 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
 
   if (!isOpen) return null;
 
-  // Calculate pricing
-  let price = 0;
-  if (selectedEvent === 'rc_race') {
-    price = 299; // External Vendor price
-  } else {
-    const windowConfig = TICKET_WINDOWS.find((w) => w.id === ticketWindow);
-    if (windowConfig) {
-      price = passType === 'individual' ? windowConfig.prices.individual : windowConfig.prices.team;
-    }
-  }
+  // Fixed pricing for RC events
+  const price = 299;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -154,7 +140,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               {step === 'payment' ? 'REGISTRATION CONFIRMED' : 'GET YOUR PASS'}
             </h2>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
-              12th &middot; 13th October 2026 &middot; American Football Ground, JECRC
+              1st October 2026 &middot; American Football Ground, JECRC
             </p>
           </div>
 
@@ -175,174 +161,62 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               <label className="block text-xs font-condensed font-bold tracking-widest text-zinc-300 uppercase mb-3">
                 1. SELECT YOUR EVENT
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setSelectedEvent('destroy')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'destroy'
-                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                    }`}
+                  disabled
+                  className="p-4 rounded-2xl border text-left transition-all border-white/5 bg-zinc-900/40 opacity-75 cursor-not-allowed"
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
                     Destroy-a-thon
                   </div>
                   <div className="text-[11px] text-zinc-400 mt-1">Tower crash challenge</div>
-                  <div className="mt-2 text-xs font-mono font-bold text-brand-red">Internal Event</div>
+                  <div className="mt-2 text-xs font-mono font-bold text-zinc-600">NOT AVAILABLE</div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setSelectedEvent('soccer')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'soccer'
-                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
-                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                    }`}
+                  disabled
+                  className="p-4 rounded-2xl border text-left transition-all border-white/5 bg-zinc-900/40 opacity-75 cursor-not-allowed"
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
                     Robo Soccer
                   </div>
                   <div className="text-[11px] text-zinc-400 mt-1">Arena bot soccer</div>
-                  <div className="mt-2 text-xs font-mono font-bold text-amber-400">Internal Event</div>
+                  <div className="mt-2 text-xs font-mono font-bold text-zinc-600">NOT AVAILABLE</div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setSelectedEvent('rc_race')}
-                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'rc_race'
-                    ? 'border-brand-cyan bg-brand-cyan/15 shadow-lg shadow-cyan-600/20'
+                  onClick={() => setSelectedEvent('offroad')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'offroad'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
                     : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
                     }`}
                 >
                   <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
-                    RC Car Race
+                    Off-Roads Reckoning
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-1">High-speed lawn circuit</div>
-                  <div className="mt-2 text-xs font-mono font-bold text-brand-cyan">Vendor Event (~₹299)</div>
+                  <div className="text-[11px] text-zinc-400 mt-1">Conquer untamed terrain with raw power.</div>
+                  <div className="mt-2 text-xs font-mono font-bold text-brand-red">RC Car Event</div>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvent('speed')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedEvent === 'speed'
+                    ? 'border-brand-red bg-brand-red/15 shadow-lg shadow-red-600/20'
+                    : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
+                    }`}
+                >
+                  <div className="font-condensed font-bold text-lg text-white uppercase leading-tight">
+                    Speed Reckoning
+                  </div>
+                  <div className="text-[11px] text-zinc-400 mt-1">Blistering speed on the ultimate track.</div>
+                  <div className="mt-2 text-xs font-mono font-bold text-brand-red">RC Car Event</div>
                 </button>
               </div>
             </div>
-
-            {/* Ticket Window & Pass Type (If Internal) */}
-            {selectedEvent !== 'rc_race' ? (
-              <>
-                <div>
-                  <label className="block text-xs font-condensed font-bold tracking-widest text-zinc-300 uppercase mb-3">
-                    2. TICKET WINDOW
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {TICKET_WINDOWS.map((window) => {
-                      const status = getWindowStatus(window, now);
-                      const isSelected = ticketWindow === window.id;
-                      const isLocked = status !== 'active';
-
-                      return (
-                        <button
-                          key={window.id}
-                          type="button"
-                          disabled={isLocked}
-                          onClick={() => setTicketWindow(window.id)}
-                          className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
-                            isSelected && !isLocked
-                              ? 'border-brand-red bg-brand-red/15'
-                              : isLocked
-                              ? 'border-white/5 bg-zinc-900/40 opacity-75 cursor-not-allowed'
-                              : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                          }`}
-                        >
-                          <div className="flex flex-col h-full justify-between">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-condensed font-bold text-base uppercase">{window.name}</span>
-                                {status === 'active' && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                    Active
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-zinc-400">
-                                {window.startDate.getDate()} {window.startDate.toLocaleString('default', { month: 'short' })} – {window.endDate.getDate()} {window.endDate.toLocaleString('default', { month: 'short' })}
-                              </div>
-                            </div>
-
-                            {status === 'upcoming' && (
-                              <div className="mt-2 pt-2 border-t border-white/5">
-                                <div className="text-[9px] text-brand-red font-bold uppercase mb-0.5">Starts in</div>
-                                <div className="flex items-center gap-1 text-xs font-mono text-zinc-300">
-                                  <Clock className="w-3 h-3 text-brand-red" />
-                                  {formatTimeLeft(window.startDate, now)}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {status === 'expired' && (
-                              <div className="mt-2 pt-2 border-t border-white/5">
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase">Expired</div>
-                              </div>
-                            )}
-
-                            {status === 'active' && (
-                              <div className="mt-2 pt-2 border-t border-white/5">
-                                <div className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">Ends in</div>
-                                <div className="flex items-center gap-1 text-xs font-mono text-zinc-300">
-                                  <Clock className="w-3 h-3 text-emerald-500" />
-                                  {formatTimeLeft(window.endDate, now)}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-condensed font-bold tracking-widest text-zinc-300 uppercase mb-3">
-                    3. ENTRY FORMAT
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPassType('individual')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'individual'
-                        ? 'border-brand-red bg-brand-red/15'
-                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                        }`}
-                    >
-                      <User className="w-5 h-5 text-brand-red" />
-                      <div>
-                        <div className="font-condensed font-bold text-base uppercase">Individual</div>
-                        <div className="text-[11px] text-zinc-400">We'll make the team for these</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPassType('team')}
-                      className={`p-3.5 rounded-xl border text-left flex items-center gap-3 transition-all ${passType === 'team'
-                        ? 'border-brand-red bg-brand-red/15'
-                        : 'border-white/10 bg-zinc-900/60 hover:border-white/30'
-                        }`}
-                    >
-                      <Users className="w-5 h-5 text-brand-red" />
-                      <div>
-                        <div className="font-condensed font-bold text-base uppercase">Team Pass</div>
-                        <div className="text-[11px] text-zinc-400">2 – 4 members squad</div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="p-4 rounded-xl bg-cyan-950/30 border border-brand-cyan/30 text-xs text-zinc-300 flex items-start gap-3">
-                <ShieldAlert className="w-5 h-5 text-brand-cyan shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block mb-1">External Vendor Partner Event:</strong>
-                  The RC Car Race is operated by our certified external racing track partner. Registration is handled with dedicated vendor slots at ₹299.
-                </div>
-              </div>
-            )}
 
             <div className="pt-4 border-t border-white/10 flex items-center justify-between">
               <div>
@@ -350,18 +224,17 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <span className="font-condensed font-black text-3xl sm:text-4xl text-white">
                   ₹{price}{' '}
                   <span className="text-xs font-sans text-zinc-400 font-normal">
-                    {passType === 'individual' && selectedEvent !== 'rc_race' ? '/ person' : '/ team'}
+                    / team
                   </span>
                 </span>
               </div>
 
               {(() => {
-                const currentWindowConfig = TICKET_WINDOWS.find((w) => w.id === ticketWindow);
-                const isLocked = selectedEvent !== 'rc_race' && currentWindowConfig && getWindowStatus(currentWindowConfig, now) !== 'active';
+                const isLocked = selectedEvent !== 'offroad' && selectedEvent !== 'speed';
                 return (
                   <button
                     type="button"
-                    disabled={isLocked || false}
+                    disabled={isLocked}
                     onClick={() => setStep('details')}
                     className={`inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-condensed font-bold text-base uppercase tracking-wider shadow-lg transition-all ${
                       isLocked
@@ -448,62 +321,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               </div>
             </div>
 
-            {passType === 'team' && selectedEvent !== 'rc_race' && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                      Team Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      name="teamName"
-                      placeholder="e.g. Kinetic Smashers"
-                      value={formData.teamName}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                      Team Size (2 to 4) *
-                    </label>
-                    <select
-                      name="teamSize"
-                      value={formData.teamSize}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-                    >
-                      <option value="2">2 Members</option>
-                      <option value="3">3 Members</option>
-                      <option value="4">4 Members</option>
-                    </select>
-                  </div>
-                </div>
-
-                {Array.from({ length: parseInt(formData.teamSize) - 1 }).map((_, idx) => (
-                  <div key={idx}>
-                    <label className="block text-xs font-condensed font-bold tracking-wider text-zinc-300 uppercase mb-1.5">
-                      Member {idx + 2} Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.teamMembers[idx] || ''}
-                      onChange={(e) => {
-                        const updatedMembers = [...formData.teamMembers];
-                        updatedMembers[idx] = e.target.value;
-                        setFormData({ ...formData, teamMembers: updatedMembers });
-                      }}
-                      placeholder={`e.g. Member ${idx + 2} Name`}
-                      className="w-full px-4 py-2.5 rounded-xl bg-zinc-900 border border-white/15 text-white text-sm focus:outline-none focus:border-brand-red"
-                    />
-                  </div>
-                ))}
-              </>
-            )}
 
             <div className="pt-4 border-t border-white/10 flex items-center justify-between">
               <button
@@ -539,7 +357,9 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
               </h3>
               <p className="text-sm text-zinc-400 mt-2 max-w-md mx-auto">
                 Thank you, <strong>{formData.name}</strong>. Your registration for{' '}
-                <strong className="text-white">{selectedEvent === 'destroy' ? 'Destroy-a-thon' : selectedEvent === 'soccer' ? 'Robo Soccer' : 'RC Car Race'}</strong>{' '}
+                <strong className="text-white">
+                  {selectedEvent === 'destroy' ? 'Destroy-a-thon' : selectedEvent === 'soccer' ? 'Robo Soccer' : selectedEvent === 'offroad' ? 'Off-Roads Reckoning' : 'Speed Reckoning'}
+                </strong>{' '}
                 has been confirmed.
               </p>
             </div>
@@ -547,7 +367,7 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left max-w-sm mx-auto">
               <div className="text-xs text-zinc-400 mb-1">Pass Type</div>
               <div className="font-bold text-white uppercase text-sm mb-3">
-                {passType} {selectedEvent !== 'rc_race' && (passType === 'team' ? `(${formData.teamSize} Members)` : '')}
+                Standard Pass
               </div>
               <div className="text-xs text-zinc-400 mb-1">Amount Paid</div>
               <div className="font-bold text-white text-lg">₹{price}</div>

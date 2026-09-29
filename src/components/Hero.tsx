@@ -47,7 +47,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                   </div>
                 </div>
                 <span className="font-condensed font-extrabold text-white text-lg xl:text-xl tracking-wider uppercase">
-                  12-13 OCTOBER 2026
+                  1ST OCTOBER 2026
                 </span>
               </div>
 
@@ -192,7 +192,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                   </div>
                 </div>
                 <span className="font-condensed font-extrabold text-white text-base tracking-wider uppercase">
-                  12-13 OCTOBER 2026
+                  1ST OCTOBER 2026
                 </span>
               </div>
 
