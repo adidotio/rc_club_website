@@ -62,7 +62,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                     JECRC UNIVERSITY
                   </span>
                   <span className="text-zinc-400 text-xs xl:text-sm font-normal mt-0.5 tracking-wide">
-                    American Football Ground
+                    Central Lawn
                   </span>
                 </div>
               </div>
@@ -205,7 +205,7 @@ export const Hero: React.FC<HeroProps> = ({ onGetPassClick }) => {
                     JECRC UNIVERSITY
                   </span>
                   <span className="text-zinc-400 text-[11px] font-normal">
-                    American Football Ground
+                    Central Lawn
                   </span>
                 </div>
               </div>
