@@ -19,10 +19,17 @@ export default async function handler(req, res) {
     // 2. Payment verified successfully! Now save to Google Sheets.
     try {
       if (participantData) {
+        // Clean up the private key (Vercel sometimes adds quotes or escapes newlines differently)
+        let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          privateKey = privateKey.slice(1, -1); // Remove surrounding quotes
+        }
+        privateKey = privateKey.replace(/\\n/g, '\n'); // Fix escaped newlines
+
         // Initialize auth
         const serviceAccountAuth = new JWT({
           email: process.env.GOOGLE_CLIENT_EMAIL,
-          key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Fix embedded newlines in env
+          key: privateKey,
           scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
 
