@@ -88,6 +88,11 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 razorpay_order_id: paymentResponse.razorpay_order_id,
                 razorpay_payment_id: paymentResponse.razorpay_payment_id,
                 razorpay_signature: paymentResponse.razorpay_signature,
+                participantData: {
+                  ...formData,
+                  event: selectedEvent,
+                  amount: price
+                }
               }),
             });
             
@@ -223,10 +228,10 @@ export const PassModal: React.FC<PassModalProps> = ({ isOpen, onClose, initialEv
                 <span className="text-xs text-zinc-400 uppercase tracking-wider block">Registration Fee</span>
                 <span className="font-condensed font-black text-3xl sm:text-4xl text-white">
                   ₹{price}{' '}
-                  <span className="text-xs font-sans text-zinc-400 font-normal">
-                    / team
-                  </span>
                 </span>
+                <div className="text-[10px] sm:text-xs text-brand-red font-bold uppercase mt-1 tracking-wider">
+                  * Two participants allowed per registration
+                </div>
               </div>
 
               {(() => {
